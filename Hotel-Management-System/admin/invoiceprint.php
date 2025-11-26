@@ -519,7 +519,7 @@
 	</aside>
 	<div style="text-align: center; margin-top: 40px; padding: 20px;">
 		<button onclick="window.print();" style="padding: 12px 30px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 15px;">
-			Print Again
+			Print
 		</button>
 	</div>
 	<script>

@@ -37,11 +37,6 @@ if (isset($_POST['guestdetailsubmit'])) {
         if (mysqli_query($conn, $sql)) {
             $last_id = mysqli_insert_id($conn);
 
-            // Insert initial payment with totals = 0
-            $payment_sql = "INSERT INTO payment (id, Name, Email, RoomType, Bed, NoofRoom, meal, cin, cout, noofdays, roomtotal, bedtotal, mealtotal, finaltotal)
-                            VALUES ($last_id, '$Name', '$Email', '$RoomType', '$Bed', '$NoofRoom', '$Meal', '$cin', '$cout', $nodays, 0, 0, 0, 0)";
-            mysqli_query($conn, $payment_sql);
-
             $_SESSION['success'] = true; // Set session for alert
             header("Location: home.php"); // Redirect to avoid resubmit
             exit;
@@ -181,6 +176,7 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
       .logo:hover {
           opacity: 0.8; /* Hiệu ứng mờ nhẹ khi hover */
       }
+
     </style>
 </head>
 
@@ -287,8 +283,12 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                         </select>
 
                         <select name="NoofRoom" class="selectinput" required>
-                            <option value selected disabled>No of Room</option>
+                            <option value="" selected disabled>No of Room</option>
                             <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
                         </select>
 
                         <select name="Meal" class="selectinput" required>
@@ -302,11 +302,11 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                         <div class="datesection">
                             <span>
                                 <label>Check-In</label>
-                                <input name="cin" type="date" required min="2025-11-26">
+                                <input name="cin" type="date" required min="<?php echo date('Y-m-d'); ?>">
                             </span>
                             <span>
                                 <label>Check-Out</label>
-                                <input name="cout" type="date" required min="2025-11-27">
+                                <input name="cout" type="date" required min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>">
                             </span>
                         </div>
                     </div>
@@ -466,7 +466,7 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
     <i class="fa-solid fa-envelope"></i>
   </div>
   <div class="createdby">
-    <h5>Created by 1 mình tao</h5>
+    <h5>Created by our team</h5>
   </div>
 </section>
 

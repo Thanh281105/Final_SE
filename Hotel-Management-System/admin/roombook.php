@@ -79,13 +79,6 @@ if (isset($_POST['action'])) {
         // Update roombook status
         mysqli_query($conn, "UPDATE roombook SET stat = '$status' WHERE id = $id");
 
-        if ($status == 'Confirmed') {
-            // Update payment (id already exists from home.php)
-            mysqli_query($conn, "UPDATE payment SET 
-                                roomtotal = $roomtotal, bedtotal = $bedtotal, mealtotal = $mealtotal, finaltotal = $finaltotal 
-                                WHERE id = $id");
-        }
-
         // Send email
         require_once '../vendor/autoload.php';
         $mail = new PHPMailer\PHPMailer\PHPMailer(true);

@@ -9,11 +9,9 @@ if (!isset($_SESSION['usermail'])) {
 
 $email = $_SESSION['usermail'];
 
-// Lấy thông tin user từ bảng signup
 $user_query = mysqli_query($conn, "SELECT * FROM signup WHERE Email = '$email' LIMIT 1");
 $user = mysqli_fetch_assoc($user_query);
 
-// Avatar (ưu tiên từ DB nếu có cột)
 $avatar = 'image/Profile.png';
 $check_col = mysqli_query($conn, "SHOW COLUMNS FROM signup LIKE 'avatar'");
 if (mysqli_num_rows($check_col) > 0) {
@@ -22,7 +20,7 @@ if (mysqli_num_rows($check_col) > 0) {
     }
 }
 
-// Lấy lịch sử đặt phòng (an toàn, không cần cột status)
+// Truy vấn booking với thông tin thanh toán từ bảng payment
 $bookings_query = mysqli_query($conn, 
     "SELECT r.*, 
             COALESCE(p.finaltotal, 0) as finaltotal,
@@ -46,6 +44,87 @@ $bookings_query = mysqli_query($conn,
     <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
 
     <style>
+        .avatar-large-container {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .avatar-large-container:hover .camera-overlay {
+            opacity: 1;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .camera-icon {
+            color: white;
+            font-size: 40px;
+            transform: scale(0.8);
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: none;
+            border-radius: 10px;
+            width: 300px;
+            text-align: center;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+
+        #file-input {
+            margin: 15px 0;
+        }
+
+        #upload-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #upload-btn:hover {
+            background-color: #0056b3;
+        }
         :root {
             --primary: #007bff;
             --success: #28a745;
@@ -120,23 +199,21 @@ $bookings_query = mysqli_query($conn,
             box-shadow: 0 5px 15px rgba(0,123,255,0.4);
             z-index: 1000;
             transition: all 0.3s;
-            display: none; /* Ẩn nút quay về home */
+            display: none;
         }
         .back-home-btn:hover {
             transform: scale(1.1);
             background: #0056b3;
         }
 
-        /* CSS mới để chỉnh sửa ảnh đại diện trong nav */
         .avatar-img {
-            width: 40px; /* Kích thước mong muốn */
-            height: 40px; /* Kích thước mong muốn */
+            width: 40px; 
+            height: 40px; 
             border-radius: 50%;
-            object-fit: cover; /* Đảm bảo ảnh không bị méo */
-            border: 2px solid white; /* Viền trắng nếu muốn */
-            cursor: pointer; /* Con trỏ khi hover */
+            object-fit: cover; 
+            border: 2px solid white; 
+            cursor: pointer; 
         }
-        /* Cập nhật dropdown-menu nếu cần */
         .dropdown-menu {
             display: none;
             position: absolute;
@@ -158,30 +235,42 @@ $bookings_query = mysqli_query($conn,
             background-color: #f1f1f1;
         }
         .avatar-dropdown {
-            position: relative; /* Đảm bảo dropdown-menu được định vị đúng */
+            position: relative; 
         }
 
-        /* CSS để logo có thể click */
         .logo {
-            cursor: pointer; /* Con trỏ tay khi hover vào logo */
-            display: flex;   /* Đảm bảo layout flex nếu cần */
-            align-items: center; /* Căn giữa theo chiều dọc */
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
         }
         .logo:hover {
-            opacity: 0.8; /* Hiệu ứng mờ nhẹ khi hover */
+            opacity: 0.8;
+        }
+        
+        .payment-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+        }
+        .payment-btn:hover {
+            background: #218838;
+            color: white;
         }
     </style>
 </head>
 <body>
 
 <nav>
-    <!-- Logo được đặt trong một thẻ <a> để click chuyển hướng -->
     <a href="home.php" class="logo" style="text-decoration: none; color: inherit; display: flex; align-items: center;">
-        <img class="bluebirdlogo" src="./image/bluebirdlogo.png" alt="logo" style="margin-right: 8px;"> <!-- Khoảng cách nhỏ giữa logo và chữ -->
+        <img class="bluebirdlogo" src="./image/bluebirdlogo.png" alt="logo" style="margin-right: 8px;">
         <p>TDTU</p>
     </a>
     <ul>
-        <!-- Bỏ <li><a href="home.php">Home</a></li> -->
         <li class="avatar-dropdown">
             <img src="<?php echo htmlspecialchars($avatar); ?>" alt="Profile" class="avatar-img">
             <div class="dropdown-menu">
@@ -193,14 +282,17 @@ $bookings_query = mysqli_query($conn,
 
 <div class="profile-container">
 
-    <!-- Header với avatar lớn -->
     <div class="profile-header">
-        <img src="<?php echo htmlspecialchars($avatar); ?>" alt="Avatar" class="avatar-large">
-        <h2 class="mt-3"><?php echo htmlspecialchars($user['Username'] ?? 'Guest'); ?></h2> <!-- Use Username -->
+        <div class="avatar-large-container" onclick="openModal()">
+            <img src="<?php echo htmlspecialchars($avatar); ?>" alt="Avatar" class="avatar-large">
+            <div class="camera-overlay">
+                <i class="fas fa-camera camera-icon"></i>
+            </div>
+        </div>
+        <h2 class="mt-3"><?php echo htmlspecialchars($user['Username'] ?? 'Guest'); ?></h2>
         <p><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($email); ?></p>
     </div>
 
-    <!-- Thông tin cá nhân -->
     <div class="info-card">
         <h4><i class="fas fa-id-card"></i> Personal Information</h4>
         <hr>
@@ -230,13 +322,12 @@ $bookings_query = mysqli_query($conn,
                 <i class="fas fa-calendar-check"></i>
                 <div>
                     <strong>Member Since</strong><br>
-                    <?php echo date('d/m/Y', strtotime($user['created_at'] ?? 'now')); ?> <!-- Nếu chưa có created_at thì dùng now -->
+                    <?php echo date('d/m/Y', strtotime($user['created_at'] ?? 'now')); ?> 
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Lịch sử đặt phòng -->
     <div class="info-card">
         <h4><i class="fas fa-bed"></i> Booking History</h4>
         <hr>
@@ -252,19 +343,17 @@ $bookings_query = mysqli_query($conn,
                             <th>Nights</th>
                             <th>Status</th>
                             <th>Total</th>
+                            <th>Payment</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php while ($b = mysqli_fetch_assoc($bookings_query)): 
-                            // Ưu tiên: nếu đã có tiền trong payment → coi là Paid
-                            // Nếu không có finaltotal hoặc = 0 → dùng stat từ roombook
-                            if (!empty($b['finaltotal']) && $b['finaltotal'] > 0) {
-                                $status = 'Paid';
-                                $status_class = 'paid';
-                            } else {
-                                $status = $b['stat'] ?? 'Not Confirmed';
-                                $status_class = strtolower(str_replace(' ', '-', $status));
-                            }
+                            // Xác định trạng thái thanh toán
+                            $status = $b['payment_status'] ?? $b['stat'];
+                            $status_class = strtolower(str_replace(' ', '-', $status));
+                            
+                            // Kiểm tra xem có thể thanh toán không
+                            $can_pay = ($b['stat'] === 'Confirmed' && $b['finaltotal'] > 0 && $status !== 'Paid');
                         ?>
                             <tr>
                                 <td>#<?php echo $b['id']; ?></td>
@@ -284,6 +373,19 @@ $bookings_query = mysqli_query($conn,
                                         <em>Pending</em>
                                     <?php endif; ?>
                                 </td>
+                                <td>
+                                    <?php if ($can_pay): ?>
+                                        <a href="generate_qr.php?booking_id=<?php echo $b['id']; ?>" class="payment-btn">
+                                            <i class="fas fa-qrcode"></i> Pay
+                                        </a>
+                                    <?php else: ?>
+                                        <?php if ($status === 'Paid'): ?>
+                                            <span class="text-success">Paid</span>
+                                        <?php else: ?>
+                                            <span class="text-muted">Unable to pay</span>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endwhile; ?>
                     </tbody>
@@ -298,14 +400,38 @@ $bookings_query = mysqli_query($conn,
     </div>
 
 </div>
-
+<!-- Avatar Upload Modal -->
+<div id="avatarModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h4>Change Avatar</h4>
+        <form id="avatarForm" action="update_avatar.php" method="POST" enctype="multipart/form-data">
+            <input type="file" id="file-input" name="avatar" accept="image/*" required>
+            <button type="submit" id="upload-btn">Upload</button>
+        </form>
+    </div>
+</div>
 
 <script>
-// Dropdown vẫn hoạt động (giống home.php)
-document.querySelectorAll('.avatar-dropdown').forEach(d => {
-    d.addEventListener('mouseenter', () => d.querySelector('.dropdown-menu').style.display = 'block');
-    d.addEventListener('mouseleave', () => d.querySelector('.dropdown-menu').style.display = 'none');
-});
+    function openModal() {
+        document.getElementById('avatarModal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('avatarModal').style.display = 'none';
+    }
+
+    // Close modal when clicking outside of it
+    window.onclick = function(event) {
+        var modal = document.getElementById('avatarModal');
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
+    document.querySelectorAll('.avatar-dropdown').forEach(d => {
+        d.addEventListener('mouseenter', () => d.querySelector('.dropdown-menu').style.display = 'block');
+        d.addEventListener('mouseleave', () => d.querySelector('.dropdown-menu').style.display = 'none');
+    });
 </script>
 
 </body>

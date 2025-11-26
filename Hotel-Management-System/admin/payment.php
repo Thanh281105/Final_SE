@@ -18,6 +18,12 @@
 	<!-- css for table and search bar -->
 	<link rel="stylesheet" href="css/roombook.css">
     <title>TDTU - Payment Management</title>
+    <style>
+        .status-pending { background: #fff3cd; color: #856404; padding: 5px 10px; border-radius: 5px; }
+        .status-paid { background: #d4edda; color: #155724; padding: 5px 10px; border-radius: 5px; }
+        .confirm-btn { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 5px; text-decoration: none; display: inline-block; }
+        .confirm-btn:hover { background: #218838; color: white; }
+    </style>
 </head>
 <body>
     <div class="searchsection">
@@ -45,6 +51,7 @@
                     <th scope="col">Bed Total</th> 
                     <th scope="col">Meal Total</th> 
                     <th scope="col">Final Total</th>
+                    <th scope="col">Status</th>
                     <th scope="col">Action</th>
                 </tr>
             </thead>
@@ -65,8 +72,20 @@
                     <td><?php echo $res['bedtotal'] ?></td>
                     <td><?php echo $res['mealtotal'] ?></td>
                     <td><?php echo $res['finaltotal'] ?></td>
+                    <td>
+                        <?php 
+                        if ($res['status'] === 'Paid'): 
+                            echo '<span class="status-paid">Paid</span>';
+                        else: 
+                            echo '<span class="status-pending">Pending</span>';
+                        endif; 
+                        ?>
+                    </td>
                     <td class="action">
                         <a href="invoiceprint.php?id=<?php echo $res['id']?>"><button class="btn btn-primary"><i class="fa-solid fa-print"></i> Print</button></a>
+                        <?php if ($res['status'] !== 'Paid'): ?>
+                            <a href="admin_payment_confirm.php?id=<?php echo $res['id']?>" onclick="return confirm('Confirm this payment?')"><button class="confirm-btn">Confirm</button></a>
+                        <?php endif; ?>
                         <a href="paymantdelete.php?id=<?php echo $res['id']?>" onclick="return confirm('Delete this payment?')"><button class="btn btn-danger">Delete</button></a>
                     </td>
                 </tr>
