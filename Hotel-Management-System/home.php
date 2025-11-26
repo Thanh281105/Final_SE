@@ -1,13 +1,70 @@
 <?php
-
 include 'config.php';
 session_start();
 
-// page redirect
-$usermail="";
-$usermail=$_SESSION['usermail'];
-if(!$usermail){
-  header("location: index.php");
+// Handle success alert from session (show only once)
+if (isset($_SESSION['success'])) {
+    echo "<script>swal({title:'Reservation successful! Waiting for admin confirmation.',icon:'success'});</script>";
+    unset($_SESSION['success']);
+}
+
+// Handle form submission (moved to top) - This part is kept from the NEW code, which already contains the OLD logic
+if (isset($_POST['guestdetailsubmit'])) {
+    $Name = mysqli_real_escape_string($conn, $_POST['Name']);
+    $Email = mysqli_real_escape_string($conn, $_POST['Email']);
+    $Country = mysqli_real_escape_string($conn, $_POST['Country']);
+    $Phone = mysqli_real_escape_string($conn, $_POST['Phone']);
+    $RoomType = mysqli_real_escape_string($conn, $_POST['RoomType']); // Lấy từ hidden input
+    $Bed = mysqli_real_escape_string($conn, $_POST['Bed']);
+    $NoofRoom = mysqli_real_escape_string($conn, $_POST['NoofRoom']);
+    $Meal = mysqli_real_escape_string($conn, $_POST['Meal']);
+    $cin = $_POST['cin'];
+    $cout = $_POST['cout'];
+
+    if (empty($Name) || empty($Email) || empty($Country) || empty($Phone) || empty($RoomType) || empty($Bed) || empty($NoofRoom) || empty($Meal) || empty($cin) || empty($cout)) {
+        echo "<script>swal({title:'Please fill all fields',icon:'error'});</script>";
+    } elseif (strtotime($cin) >= strtotime($cout)) {
+        echo "<script>swal({title:'Check-out must be after check-in',icon:'error'});</script>";
+    } elseif (strtotime($cin) < strtotime('2025-11-26')) {
+        echo "<script>swal({title:'Check-in cannot be in the past',icon:'error'});</script>";
+    } else {
+        $sta = 'Not Confirmed';
+        $nodays = (strtotime($cout) - strtotime($cin)) / (60 * 60 * 24);
+
+        $sql = "INSERT INTO roombook (Name, Email, Country, Phone, RoomType, Bed, NoofRoom, Meal, cin, cout, stat, nodays)
+                VALUES ('$Name', '$Email', '$Country', '$Phone', '$RoomType', '$Bed', '$NoofRoom', '$Meal', '$cin', '$cout', '$sta', $nodays)";
+
+        if (mysqli_query($conn, $sql)) {
+            $last_id = mysqli_insert_id($conn);
+
+            // Insert initial payment with totals = 0
+            $payment_sql = "INSERT INTO payment (id, Name, Email, RoomType, Bed, NoofRoom, meal, cin, cout, noofdays, roomtotal, bedtotal, mealtotal, finaltotal)
+                            VALUES ($last_id, '$Name', '$Email', '$RoomType', '$Bed', '$NoofRoom', '$Meal', '$cin', '$cout', $nodays, 0, 0, 0, 0)";
+            mysqli_query($conn, $payment_sql);
+
+            $_SESSION['success'] = true; // Set session for alert
+            header("Location: home.php"); // Redirect to avoid resubmit
+            exit;
+        } else {
+            echo "<script>swal({title:'Something went wrong: " . mysqli_error($conn) . "',icon:'error'});</script>";
+        }
+    }
+}
+
+// Page redirect if not logged in
+$usermail = $_SESSION['usermail'];
+if (!$usermail) {
+    header("location: index.php");
+    exit;
+}
+
+// Get user avatar (assume from signup table, or default) - Kept from NEW code
+$avatar = './images/Profile.png'; // Default
+$user_sql = "SELECT avatar FROM signup WHERE Email = '$usermail'"; // Assume you add 'avatar' column later
+$user_res = mysqli_query($conn, $user_sql);
+if ($user_res && mysqli_num_rows($user_res) > 0) {
+    $user_row = mysqli_fetch_assoc($user_res);
+    if (!empty($user_row['avatar'])) $avatar = $user_row['avatar'];
 }
 ?>
 
@@ -80,22 +137,93 @@ if(!$usermail){
       }
 
       .detailbtn { margin-right: 5px; }
+
+      .avatar-dropdown {
+          position: relative;
+          display: inline-block;
+      }
+      .avatar-img {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          cursor: pointer;
+      }
+      .dropdown-menu {
+          display: none;
+          position: absolute;
+          right: 0;
+          background: white;
+          box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+          z-index: 1;
+          min-width: 160px;
+      }
+      .dropdown-menu a {
+          color: black;
+          padding: 12px 16px;
+          text-decoration: none;
+          display: block;
+      }
+      .dropdown-menu a:hover {
+          background-color: #f1f1f1;
+      }
+      .avatar-dropdown:hover .dropdown-menu {
+          display: block;
+      }
+
+      /* CSS mới để logo có thể click */
+      .logo {
+          cursor: pointer; /* Con trỏ tay khi hover vào logo */
+          display: flex;   /* Đảm bảo layout flex nếu cần */
+          align-items: center; /* Căn giữa theo chiều dọc */
+          text-decoration: none; /* Loại bỏ gạch chân mặc định nếu là link */
+          color: inherit; /* Giữ màu văn bản mặc định */
+      }
+      .logo:hover {
+          opacity: 0.8; /* Hiệu ứng mờ nhẹ khi hover */
+      }
     </style>
 </head>
 
 <body>
 
   <nav>
-    <div class="logo">
-      <img class="bluebirdlogo" src="./image/bluebirdlogo.png" alt="logo">
-      <p>TDTU</p>
-    </div>
+    <!-- Logo được đặt trong một thẻ <a> để click chuyển hướng -->
+    <a href="home.php" class="logo" style="text-decoration: none; color: inherit; display: flex; align-items: center;">
+        <img class="bluebirdlogo" src="./image/bluebirdlogo.png" alt="logo" style="margin-right: 8px;"> <!-- Khoảng cách nhỏ giữa logo và chữ -->
+        <p>TDTU</p>
+    </a>
     <ul>
-      <li><a href="#firstsection">Home</a></li>
+      <li><a href="#firstsection">Home</a></li> <!-- Có thể giữ hoặc bỏ, tùy bạn -->
       <li><a href="#secondsection">Rooms</a></li>
       <li><a href="#thirdsection">Facilities</a></li>
       <li><a href="#contactus">Contact us</a></li>
-      <a href="./logout.php"><button class="btn btn-danger">Logout</button></a>
+
+      <!-- Bỏ <a href="./logout.php"><button class="btn btn-danger">Logout</button></a> -->
+      <li class="avatar-dropdown">
+        <?php
+        $avatar_path = 'image/Profile.png';
+
+        if (isset($_SESSION['usermail'])) {
+            $email = $_SESSION['usermail'];
+            $check_col = mysqli_query($conn, "SHOW COLUMNS FROM signup LIKE 'avatar'");
+            if (mysqli_num_rows($check_col) > 0) {
+                $res = mysqli_query($conn, "SELECT avatar FROM signup WHERE Email = '$email' LIMIT 1");
+                if ($res && mysqli_num_rows($res) > 0) {
+                    $row = mysqli_fetch_assoc($res);
+                    if (!empty($row['avatar']) && file_exists($row['avatar'])) {
+                        $avatar_path = $row['avatar'];
+                    }
+                }
+            }
+        }
+        ?>
+        <img src="<?php echo htmlspecialchars($avatar_path); ?>" alt="Profile" class="avatar-img">
+
+        <div class="dropdown-menu">
+          <a href="profile.php"><i class="fas fa-user"></i> Profile</a>
+          <a href="logout.php"><i class="text-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+      </li>
     </ul>
   </nav>
 
@@ -113,120 +241,88 @@ if(!$usermail){
 
         <!-- ========== BOOKING PANEL ========== -->
         <div id="guestdetailpanel">
-          <form action="" method="POST" class="guestdetailpanelform">
-              <div class="head">
-                  <h3>RESERVATION</h3>
-                  <i class="fa-solid fa-circle-xmark" onclick="closebox()"></i>
-              </div>
+            <form action="" method="POST" class="guestdetailpanelform">
+                <div class="head">
+                    <h3>RESERVATION</h3>
+                    <i class="fa-solid fa-circle-xmark" onclick="closebox()"></i>
+                </div>
 
-              <div class="middle">
-                  <div class="guestinfo">
-                      <h4>Guest information</h4>
-                      <input type="text" name="Name" placeholder="Enter Full name">
-                      <input type="email" name="Email" placeholder="Enter Email">
+                <div class="middle">
+                    <div class="guestinfo">
+                        <h4>Guest information</h4>
+                        <input type="text" name="Name" placeholder="Enter Full name" required>
+                        <input type="email" name="Email" placeholder="Enter Email" required>
 
-                      <?php
-                      $countries = array("Vietnam","Japan","USA","England","France","Germany","Australia","Canada","India",
-                      "Singapore","Thailand","China","Korea","Brazil","Spain","Italy");
-                      ?>
-                      <select name="Country" class="selectinput">
-                          <option value selected>Select your country</option>
-                          <?php foreach($countries as $c): ?>
-                            <option value="<?= $c ?>"><?= $c ?></option>
-                          <?php endforeach; ?>
-                      </select>
-                      <input type="text" name="Phone" placeholder="Enter Phone">
-                  </div>
+                        <?php
+                        $countries = array("Vietnam", "China", "Japan", "Korea", "Thailand", "Laos", "Campuchia", "Singapore", "Indonesia", "Philippines");
+                        ?>
+                        <select name="Country" class="selectinput" required>
+                            <option value selected disabled>Select your country</option>
+                            <?php foreach($countries as $c): ?>
+                              <option value="<?= $c ?>"><?= $c ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <input type="text" name="Phone" placeholder="Enter Phone" required>
+                    </div>
 
-                  <div class="line"></div>
+                    <div class="line"></div>
 
-                  <div class="reservationinfo">
-                      <h4>Reservation information</h4>
+                    <div class="reservationinfo">
+                        <h4>Reservation information</h4>
 
-                      <select name="RoomType" class="selectinput">
-                          <option value selected>Type Of Room</option>
-                          <option value="Superior Room">SUPERIOR ROOM</option>
-                          <option value="Deluxe Room">DELUX ROOM</option>
-                          <option value="Guest House">GUEST HOUSE</option>
-                          <option value="Single Room">SINGLE ROOM</option>
-                      </select>
+                        <!-- Hidden input để lưu RoomType -->
+                        <input type="hidden" name="RoomType" id="fixedRoomType" value="">
+                          <div class="form-group">
+                            <label>Type Of Room</label>
+                            <!-- Hiển thị tên phòng đã chọn -->
+                            <p id="roomTypeDisplay" style="font-weight: bold; color: #007bff;">(Select a room type)</p>
+                          </div>
 
-                      <select name="Bed" class="selectinput">
-                          <option value selected>Bedding Type</option>
-                          <option value="Single">Single</option>
-                          <option value="Double">Double</option>
-                          <option value="Triple">Triple</option>
-                          <option value="Quad">Quad</option>
-                      </select>
+                        <select name="Bed" class="selectinput" required>
+                            <option value selected disabled>Bedding Type</option>
+                            <option value="Single">Single</option>
+                            <option value="Double">Double</option>
+                            <option value="Triple">Triple</option>
+                            <option value="Quad">Quad</option>
+                        </select>
 
-                      <select name="NoofRoom" class="selectinput">
-                          <option value selected>No of Room</option>
-                          <option value="1">1</option>
-                      </select>
+                        <select name="NoofRoom" class="selectinput" required>
+                            <option value selected disabled>No of Room</option>
+                            <option value="1">1</option>
+                        </select>
 
-                      <select name="Meal" class="selectinput">
-                          <option value selected>Meal</option>
-                          <option value="Room only">Room only</option>
-                          <option value="Breakfast">Breakfast</option>
-                          <option value="Half Board">Half Board</option>
-                          <option value="Full Board">Full Board</option>
-                      </select>
+                        <select name="Meal" class="selectinput" required>
+                            <option value selected disabled>Meal</option>
+                            <option value="Room only">Room only</option>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Half Board">Half Board</option>
+                            <option value="Full Board">Full Board</option>
+                        </select>
 
-                      <div class="datesection">
-                          <span>
-                              <label>Check-In</label>
-                              <input name="cin" type="date">
-                          </span>
-                          <span>
-                              <label>Check-Out</label>
-                              <input name="cout" type="date">
-                          </span>
-                      </div>
-                  </div>
-              </div>
+                        <div class="datesection">
+                            <span>
+                                <label>Check-In</label>
+                                <input name="cin" type="date" required min="2025-11-26">
+                            </span>
+                            <span>
+                                <label>Check-Out</label>
+                                <input name="cout" type="date" required min="2025-11-27">
+                            </span>
+                        </div>
+                    </div>
+                </div>
 
-              <div class="footer">
-                  <button class="btn btn-success" name="guestdetailsubmit">Submit</button>
-              </div>
-          </form>
-
-          <?php
-            if (isset($_POST['guestdetailsubmit'])) {
-                $Name = $_POST['Name'];
-                $Email = $_POST['Email'];
-                $Country = $_POST['Country'];
-                $Phone = $_POST['Phone'];
-                $RoomType = $_POST['RoomType'];
-                $Bed = $_POST['Bed'];
-                $NoofRoom = $_POST['NoofRoom'];
-                $Meal = $_POST['Meal'];
-                $cin = $_POST['cin'];
-                $cout = $_POST['cout'];
-
-                if($Name=="" || $Email=="" || $Country==""){
-                    echo "<script>swal({title:'Fill the proper details',icon:'error'});</script>";
-                } else {
-                    $sta = "NotConfirm";
-                    $sql = "INSERT INTO roombook(Name,Email,Country,Phone,RoomType,Bed,NoofRoom,Meal,cin,cout,stat,nodays)
-                    VALUES('$Name','$Email','$Country','$Phone','$RoomType','$Bed','$NoofRoom','$Meal','$cin','$cout',
-                    '$sta',datediff('$cout','$cin'))";
-
-                    $result = mysqli_query($conn, $sql);
-
-                    if ($result) {
-                        echo "<script>swal({title:'Reservation successful',icon:'success'});</script>";
-                    } else {
-                        echo "<script>swal({title:'Something went wrong',icon:'error'});</script>";
-                    }
-                }
-            }
-          ?>
+                <div class="footer">
+                    <!-- Nút submit vẫn giữ nguyên -->
+                    <button class="btn btn-success" name="guestdetailsubmit">Submit</button>
+                </div>
+            </form>
         </div>
     </div>
   </section>
 
   <!-- ========== OUR ROOMS ========== -->
-  <section id="secondsection"> 
+  <section id="secondsection">
     <img src="./image/homeanimatebg.svg">
     <div class="ourroom">
       <h1 class="head">≼ Our room ≽</h1>
@@ -247,7 +343,7 @@ if(!$usermail){
             </div>
 
             <button class="btn btn-secondary detailbtn" onclick="openDetail('superior')">View Details</button>
-            <button class="btn btn-primary bookbtn" onclick="openbookbox()">Book</button>
+            <button class="btn btn-primary bookbtn" onclick="openbook('Superior Room')">Book</button> <!-- Gọi openbook với tên phòng -->
           </div>
         </div>
 
@@ -264,7 +360,7 @@ if(!$usermail){
             </div>
 
             <button class="btn btn-secondary detailbtn" onclick="openDetail('deluxe')">View Details</button>
-            <button class="btn btn-primary bookbtn" onclick="openbookbox()">Book</button>
+            <button class="btn btn-primary bookbtn" onclick="openbook('Deluxe Room')">Book</button> <!-- Gọi openbook với tên phòng -->
           </div>
         </div>
 
@@ -280,7 +376,7 @@ if(!$usermail){
             </div>
 
             <button class="btn btn-secondary detailbtn" onclick="openDetail('guestroom')">View Details</button>
-            <button class="btn btn-primary bookbtn" onclick="openbookbox()">Book</button>
+            <button class="btn btn-primary bookbtn" onclick="openbook('Guest House')">Book</button> <!-- Gọi openbook với tên phòng -->
           </div>
         </div>
 
@@ -295,7 +391,7 @@ if(!$usermail){
             </div>
 
             <button class="btn btn-secondary detailbtn" onclick="openDetail('single')">View Details</button>
-            <button class="btn btn-primary bookbtn" onclick="openbookbox()">Book</button>
+            <button class="btn btn-primary bookbtn" onclick="openbook('Single Room')">Book</button> <!-- Gọi openbook với tên phòng -->
           </div>
         </div>
 
@@ -391,7 +487,7 @@ if(!$usermail){
         <div id="roomfacilities"></div>
 
         <div class="detail-actions">
-            <button class="btn btn-primary" onclick="openbookbox()">Book Now</button>
+            <button class="btn btn-primary" onclick="openbook()">Book Now</button> <!-- Gọi openbook không tham số để chỉ mở form -->
             <button class="btn btn-secondary" onclick="closeDetail()">Close</button>
         </div>
 
@@ -408,6 +504,21 @@ if(!$usermail){
         bookbox.style.display = "none";
     }
 
+    // Cập nhật hàm openbook để nhận tham số tên phòng
+    function openbook(roomtype = '') {
+        document.getElementById('guestdetailpanel').style.display = 'flex';
+        if (roomtype) {
+            document.getElementById('fixedRoomType').value = roomtype;
+            document.getElementById('roomTypeDisplay').innerText = roomtype;
+        }
+    }
+
+    function closebox() {
+        document.getElementById('guestdetailpanel').style.display = 'none';
+        // Reset nếu cần
+        document.getElementById('fixedRoomType').value = '';
+        document.getElementById('roomTypeDisplay').innerText = '(Select a room type)';
+      }
     // ======================= DATA FOR ROOMS & FACILITIES =======================
     const viewData = {
 

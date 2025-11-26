@@ -1,0 +1,14 @@
+# IDE
+.vs/
+.vscode/
+
+# PHP
+vendor/
+composer.lock
+*.log
+*.cache
+.DS_Store
+
+# OS
+Thumbs.db
+desktop.ini

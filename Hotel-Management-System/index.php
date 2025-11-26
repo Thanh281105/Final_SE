@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 include 'config.php';
 session_start();
 
@@ -8,7 +8,10 @@ function prepareAndExecute($conn, $sql, $params)
     if ($stmt === false) {
         die('mysqli error: ' . htmlspecialchars($conn->error));
     }
-    $stmt->bind_param(str_repeat('s', count($params)), ...$params);
+    // Cập nhật để tự động xác định kiểu dữ liệu dựa trên số lượng và loại tham số.
+    // Hàm này hiện tại chỉ hỗ trợ chuỗi ('s'). Nếu có số nguyên, cần cải tiến.
+    $types = str_repeat('s', count($params)); // Giả định tất cả là chuỗi
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     return $stmt;
 }
@@ -100,7 +103,10 @@ function prepareAndExecute($conn, $sql, $params)
                     </div>
                     <button type="submit" name="user_login_submit" class="auth_btn">Log in</button>
                     <div class="footer_line">
-                        <h6>Don't have an account? <span class="page_move_btn" onclick="signuppage()">sign up</span></h6>
+                        <h6>Forgot password? <span class="page_move_btn" onclick="window.location='forgot-password.php?type=user'">Reset here</span></h6>
+                    </div>
+                    <div class="footer_line">
+                        <h6>Don't have an account? <span class="page_move_btn" onclick="signuppage()">Sign up</span></h6>
                     </div>
                 </form>
 
@@ -132,6 +138,9 @@ function prepareAndExecute($conn, $sql, $params)
                         <label for="floatingPassword">Password</label>
                     </div>
                     <button type="submit" name="Emp_login_submit" class="auth_btn">Log in</button>
+                    <div class="footer_line">
+                        <h6>Forgot password? <span class="page_move_btn" onclick="window.location='forgot-password.php?type=staff'">Reset here</span></h6>
+                    </div>
                 </form>
             </div>
 
@@ -142,11 +151,18 @@ function prepareAndExecute($conn, $sql, $params)
                 $email = $_POST['Email'];
                 $password = $_POST['Password'];
                 $cpassword = $_POST['CPassword'];
+                $phone = $_POST['Phone']; // Lấy số điện thoại
 
-                if ($username == "" || $email == "" || $password == "") {
+                // Thêm kiểm tra số điện thoại (tùy chọn, nhưng nên có)
+                if ($username == "" || $email == "" || $password == "" || $phone == "") { // Thêm $phone vào điều kiện kiểm tra
                     echo "<script>swal({ title: 'Fill the proper details', icon: 'error', });</script>";
                 } else {
-                    if ($password == $cpassword) {
+                    // Thêm kiểm tra định dạng số điện thoại cơ bản (tùy chọn)
+                    if (!preg_match('/^[0-9]{10,15}$/', $phone)) { // Kiểm tra có 10-15 chữ số
+                        echo "<script>swal({ title: 'Please enter a valid phone number (10-15 digits)', icon: 'error', });</script>";
+                    } elseif ($password != $cpassword) {
+                         echo "<script>swal({ title: 'Password does not match', icon: 'error', });</script>";
+                    } else {
                         $sql_check = "SELECT * FROM signup WHERE Email = ?";
                         $stmt_check = prepareAndExecute($conn, $sql_check, [$email]);
                         $result = $stmt_check->get_result();
@@ -154,8 +170,10 @@ function prepareAndExecute($conn, $sql, $params)
                         if ($result->num_rows > 0) {
                             echo "<script>swal({ title: 'Email already exists', icon: 'error', });</script>";
                         } else {
-                            $sql_insert = "INSERT INTO signup (Username, Email, Password) VALUES (?, ?, ?)";
-                            $stmt_insert = prepareAndExecute($conn, $sql_insert, [$username, $email, $password]);
+                            // Cập nhật câu lệnh INSERT để bao gồm trường Phone
+                            $sql_insert = "INSERT INTO signup (Username, Email, Password, Phone) VALUES (?, ?, ?, ?)";
+                            // Cập nhật mảng tham số để bao gồm $phone
+                            $stmt_insert = prepareAndExecute($conn, $sql_insert, [$username, $email, $password, $phone]);
 
                             if ($stmt_insert->affected_rows > 0) {
                                 $_SESSION['usermail'] = $email;
@@ -165,8 +183,6 @@ function prepareAndExecute($conn, $sql, $params)
                                 echo "<script>swal({ title: 'Something went wrong', icon: 'error', });</script>";
                             }
                         }
-                    } else {
-                        echo "<script>swal({ title: 'Password does not match', icon: 'error', });</script>";
                     }
                 }
             }
@@ -185,6 +201,10 @@ function prepareAndExecute($conn, $sql, $params)
                     <div class="form-floating">
                         <input type="password" class="form-control" name="Password" placeholder=" ">
                         <label for="Password">Password</label>
+                    </div>
+                    <div class="form-floating"> 
+                        <input type="tel" class="form-control" name="Phone" placeholder=" " pattern="[0-9]{10,15}" title="Please enter a phone number with 10 to 15 digits.">
+                        <label for="Phone">Phone Number</label>
                     </div>
                     <div class="form-floating">
                         <input type="password" class="form-control" name="CPassword" placeholder=" ">
