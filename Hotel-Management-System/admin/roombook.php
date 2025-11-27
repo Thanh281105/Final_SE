@@ -71,13 +71,22 @@ if (isset($_POST['action'])) {
             default => 0
         };
 
-        $roomtotal = $type_of_room * $nodays * $NoofRoom;
-        $bedtotal = $type_of_bed * $nodays;
-        $mealtotal = $type_of_meal * $nodays;
+        $roomtotal = $type_of_room * $nodays * $NoofRoom * 1000;
+        $bedtotal = $type_of_bed * $nodays * $NoofRoom * 1000;
+        $mealtotal = $type_of_meal * $nodays * $NoofRoom * 1000;
         $finaltotal = $roomtotal + $bedtotal + $mealtotal;
 
         // Update roombook status
         mysqli_query($conn, "UPDATE roombook SET stat = '$status' WHERE id = $id");
+
+        if ($status == 'Confirmed') {
+            $check_payment = mysqli_query($conn, "SELECT * FROM payment WHERE id = $id");
+            if (mysqli_num_rows($check_payment) == 0) {
+                $payment_sql = "INSERT INTO payment (id, Name, Email, RoomType, Bed, NoofRoom, meal, cin, cout, noofdays, roomtotal, bedtotal, mealtotal, finaltotal, status) 
+                                VALUES ($id, '$Name', '$Email', '$RoomType', '$Bed', $NoofRoom, '$Meal', '$cin', '$cout', $nodays, $roomtotal, $bedtotal, $mealtotal, $finaltotal, 'Pending')";
+                mysqli_query($conn, $payment_sql);
+            }
+        }
 
         // Send email
         require_once '../vendor/autoload.php';
@@ -167,15 +176,16 @@ $result = mysqli_query($conn, $sql);
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Customer</th>
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Country</th> 
-                    <th>Type of room</th>
+                    <th>Type of Room</th>
+                    <th>Bed</th>
                     <th>Meal</th>
+                    <th>No of Room</th>
                     <th>Check-in</th>
                     <th>Check-out</th>
-                    <th>Number of days</th>
+                    <th>No of Days</th>
                     <th>State</th>
                     <th>Action</th>
                 </tr>
@@ -184,12 +194,13 @@ $result = mysqli_query($conn, $sql);
                 <?php while ($row = mysqli_fetch_assoc($result)): ?>
                 <tr>
                     <td><?php echo $row['id']; ?></td>
-                    <td><?php echo $row['Name']; ?></td>
                     <td><?php echo $row['Email']; ?></td>
                     <td><?php echo $row['Phone']; ?></td>
                     <td><?php echo $row['Country']; ?></td> 
                     <td><?php echo $row['RoomType']; ?></td>
+                    <td><?php echo $row['Bed']; ?></td>
                     <td><?php echo $row['Meal']; ?></td>
+                    <td><?php echo $row['NoofRoom']; ?></td>
                     <td><?php echo date('d/m/Y', strtotime($row['cin'])); ?></td>
                     <td><?php echo date('d/m/Y', strtotime($row['cout'])); ?></td>
                     <td><?php echo $row['nodays']; ?></td>
@@ -200,7 +211,7 @@ $result = mysqli_query($conn, $sql);
                         <?php if ($row['stat'] == 'Not Confirmed'): ?>
                             <form method="POST" style="display: inline;">
                                 <input type="hidden" name="id" value="<?php echo $row['id']; ?>">
-                                <button type="submit" name="action" value="confirm" class="btn btn-confirm">Comfirm</button>
+                                <button type="submit" name="action" value="confirm" class="btn btn-confirm">Confirm</button>
                                 <button type="submit" name="action" value="reject" class="btn btn-reject">Reject</button>
                             </form>
                         <?php endif; ?>

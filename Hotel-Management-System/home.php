@@ -8,13 +8,13 @@ if (isset($_SESSION['success'])) {
     unset($_SESSION['success']);
 }
 
-// Handle form submission (moved to top) - This part is kept from the NEW code, which already contains the OLD logic
+// Handle form submission (moved to top) 
 if (isset($_POST['guestdetailsubmit'])) {
     $Name = mysqli_real_escape_string($conn, $_POST['Name']);
     $Email = mysqli_real_escape_string($conn, $_POST['Email']);
     $Country = mysqli_real_escape_string($conn, $_POST['Country']);
     $Phone = mysqli_real_escape_string($conn, $_POST['Phone']);
-    $RoomType = mysqli_real_escape_string($conn, $_POST['RoomType']); // Lấy từ hidden input
+    $RoomType = mysqli_real_escape_string($conn, $_POST['RoomType']);
     $Bed = mysqli_real_escape_string($conn, $_POST['Bed']);
     $NoofRoom = mysqli_real_escape_string($conn, $_POST['NoofRoom']);
     $Meal = mysqli_real_escape_string($conn, $_POST['Meal']);
@@ -29,7 +29,7 @@ if (isset($_POST['guestdetailsubmit'])) {
         echo "<script>swal({title:'Check-in cannot be in the past',icon:'error'});</script>";
     } else {
         $sta = 'Not Confirmed';
-        $nodays = (strtotime($cout) - strtotime($cin)) / (60 * 60 * 24);
+        $nodays = ((strtotime($cout) - strtotime($cin)) / (60 * 60 * 24));
 
         $sql = "INSERT INTO roombook (Name, Email, Country, Phone, RoomType, Bed, NoofRoom, Meal, cin, cout, stat, nodays)
                 VALUES ('$Name', '$Email', '$Country', '$Phone', '$RoomType', '$Bed', '$NoofRoom', '$Meal', '$cin', '$cout', '$sta', $nodays)";
@@ -165,16 +165,15 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
           display: block;
       }
 
-      /* CSS mới để logo có thể click */
       .logo {
-          cursor: pointer; /* Con trỏ tay khi hover vào logo */
-          display: flex;   /* Đảm bảo layout flex nếu cần */
-          align-items: center; /* Căn giữa theo chiều dọc */
-          text-decoration: none; /* Loại bỏ gạch chân mặc định nếu là link */
-          color: inherit; /* Giữ màu văn bản mặc định */
+          cursor: pointer; 
+          display: flex;  
+          align-items: center; 
+          text-decoration: none; 
+          color: inherit; 
       }
       .logo:hover {
-          opacity: 0.8; /* Hiệu ứng mờ nhẹ khi hover */
+          opacity: 0.8; 
       }
 
     </style>
@@ -266,15 +265,14 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                     <div class="reservationinfo">
                         <h4>Reservation information</h4>
 
-                        <!-- Hidden input để lưu RoomType -->
                         <input type="hidden" name="RoomType" id="fixedRoomType" value="">
-                          <div class="form-group">
-                            <label>Type Of Room</label>
-                            <!-- Hiển thị tên phòng đã chọn -->
-                            <p id="roomTypeDisplay" style="font-weight: bold; color: #007bff;">(Select a room type)</p>
-                          </div>
+                            <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                                <label style="margin: 0; font-weight: 500;">Type Of Room</label>
+                                <!-- Hiển thị tên phòng đã chọn -->
+                                <p id="roomTypeDisplay" style="font-weight: bold; color: #007bff; margin: 0; flex-shrink: 0;">(Select a room type)</p>
+                            </div>
 
-                        <select name="Bed" class="selectinput" required>
+                        <select name="Bed" class="selectinput" required onchange="calculateTotal()">
                             <option value selected disabled>Bedding Type</option>
                             <option value="Single">Single</option>
                             <option value="Double">Double</option>
@@ -282,16 +280,16 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                             <option value="Quad">Quad</option>
                         </select>
 
-                        <select name="NoofRoom" class="selectinput" required>
-                            <option value="" selected disabled>No of Room</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                        </select>
+                        <div class="quantity-selector" style="display: flex; align-items: center; gap: 15px; flex-wrap: nowrap;">
+                            <label style="margin: 0; font-weight: 500; white-space: nowrap;">No of Room</label>
+                            <div class="input-group" style="display: flex; align-items: center; flex-shrink: 0; gap: 0;">
+                                <button type="button" class="btn btn-outline-secondary" style="border-radius: 4px 0 0 4px; margin: 0;" onclick="decreaseValue(); calculateTotal()">-</button>
+                                <input type="number" name="NoofRoom" class="selectinput text-center" value="1" min="1" max="5" readonly style="width: 60px; border: 1px solid #ced4da; border-left: none; border-right: none; outline: none; text-align: center; margin: 0;">
+                                <button type="button" class="btn btn-outline-secondary" style="border-radius: 0 4px 4px 0; margin: 0;" onclick="increaseValue(); calculateTotal()">+</button>
+                            </div>
+                        </div>
 
-                        <select name="Meal" class="selectinput" required>
+                        <select name="Meal" class="selectinput" required onchange="calculateTotal()">
                             <option value selected disabled>Meal</option>
                             <option value="Room only">Room only</option>
                             <option value="Breakfast">Breakfast</option>
@@ -302,19 +300,21 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                         <div class="datesection">
                             <span>
                                 <label>Check-In</label>
-                                <input name="cin" type="date" required min="<?php echo date('Y-m-d'); ?>">
+                                <input name="cin" type="date" required min="<?php echo date('Y-m-d'); ?>" onchange="calculateTotal()">
                             </span>
                             <span>
                                 <label>Check-Out</label>
-                                <input name="cout" type="date" required min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>">
+                                <input name="cout" type="date" required min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>" onchange="calculateTotal()">
                             </span>
                         </div>
+                
+                        <!-- Di chuyển phần hiển thị giá tiền vào đây -->
+                        <div id="totalPrice"></div>
                     </div>
                 </div>
 
                 <div class="footer">
-                    <!-- Nút submit vẫn giữ nguyên -->
-                    <button class="btn btn-success" name="guestdetailsubmit">Submit</button>
+                    <button class="btn btn-success" name="guestdetailsubmit">Book</button>
                 </div>
             </form>
         </div>
@@ -680,6 +680,114 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
 
     function closeDetail() {
         document.getElementById("roomdetailpanel").style.display = "none";
+    }
+
+
+    function calculateTotal() {
+        // Lấy giá trị từ form
+        const roomType = document.getElementById('fixedRoomType').value;
+        const noOfRoom = parseInt(document.querySelector('input[name="NoofRoom"]').value) || 0;
+        const cin = document.querySelector('input[name="cin"]').value;
+        const cout = document.querySelector('input[name="cout"]').value;
+    
+        if (!roomType || !cin || !cout) {
+            document.getElementById('totalPrice').innerHTML = '';
+            return;
+        }
+    
+        // Tính số ngày
+        const startDate = new Date(cin);
+        const endDate = new Date(cout);
+        const nodays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    
+        if (nodays <= 0) {
+            document.getElementById('totalPrice').innerHTML = '';
+            return;
+        }
+    
+        // Giá phòng cơ bản
+        const type_of_room = {
+            'Superior Room': 3000,
+            'Deluxe Room': 2000,
+            'Guest House': 1500,
+            'Single Room': 1000
+        }[roomType] || 0;
+    
+        // Lấy giá giường và bữa ăn từ các dropdown
+        const bed = document.querySelector('select[name="Bed"]').value;
+        const meal = document.querySelector('select[name="Meal"]').value;
+    
+        // Tính giá giường
+        let type_of_bed = 0;
+        switch(bed) {
+            case 'Single': type_of_bed = type_of_room * 1 / 100; break;
+            case 'Double': type_of_bed = type_of_room * 2 / 100; break;
+            case 'Triple': type_of_bed = type_of_room * 3 / 100; break;
+            case 'Quad': type_of_bed = type_of_room * 4 / 100; break;
+        }
+    
+        // Tính giá bữa ăn
+        let type_of_meal = 0;
+        switch(meal) {
+            case 'Breakfast': type_of_meal = type_of_bed * 2; break;
+            case 'Half Board': type_of_meal = type_of_bed * 3; break;
+            case 'Full Board': type_of_meal = type_of_bed * 4; break;
+        }
+    
+        // Tính tổng
+        const roomtotal = type_of_room * nodays * noOfRoom * 1000;
+        const bedtotal = type_of_bed * nodays * noOfRoom * 1000;
+        const mealtotal = type_of_meal * nodays * noOfRoom * 1000;
+        const finaltotal = roomtotal + bedtotal + mealtotal;
+    
+        // Hiển thị tổng tiền
+        document.getElementById('totalPrice').innerHTML = 
+            '<h4 style="color: #007bff; margin-top: 15px;">Total: ' + 
+            finaltotal.toLocaleString('vi-VN') + ' VND</h4>';
+    }
+
+    // Gọi hàm tính giá khi có thay đổi
+    document.addEventListener('DOMContentLoaded', function() {
+        // Gán sự kiện cho các phần tử
+        const elements = [
+            'select[name="Bed"]',
+            'select[name="Meal"]',
+            'input[name="NoofRoom"]',
+            'input[name="cin"]',
+            'input[name="cout"]'
+        ];
+    
+        elements.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                element.addEventListener('change', calculateTotal);
+                element.addEventListener('input', calculateTotal);
+            }
+        });
+    
+        // Gán cho nút cộng/trừ số phòng
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(button => {
+            button.addEventListener('click', calculateTotal);
+        });
+    });
+
+    function increaseValue() {
+        var input = document.querySelector('input[name="NoofRoom"]');
+        var value = parseInt(input.value);
+        if (value < 5) {
+            input.value = value + 1;
+        }
+        calculateTotal(); // Gọi lại hàm tính giá
+    }
+
+    function decreaseValue() {
+        var input = document.querySelector('input[name="NoofRoom"]');
+        var value = parseInt(input.value);
+        if (value > 1) {
+            input.value = value - 1;
+        }
+        calculateTotal(); // Gọi lại hàm tính giá
     }
 
 </script>

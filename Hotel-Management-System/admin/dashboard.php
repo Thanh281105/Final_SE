@@ -1,11 +1,12 @@
-<?php
+﻿<?php
     session_start();
     include '../config.php';
 
-    // roombook
-    $roombooksql ="Select * from roombook";
+    // roombook - tính tổng số phòng từ trường NoofRoom trong bảng payment với status = 'Paid'
+    $roombooksql = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE status = 'Paid'";
     $roombookre = mysqli_query($conn, $roombooksql);
-    $roombookrow = mysqli_num_rows($roombookre);
+    $roombookrow_result = mysqli_fetch_assoc($roombookre);
+    $roombookrow = $roombookrow_result['total_rooms'] ?? 0; // Nếu không có kết quả thì = 0
 
     // staff
     $staffsql ="Select * from staff";
@@ -17,37 +18,40 @@
     $roomre = mysqli_query($conn, $roomsql);
     $roomrow = mysqli_num_rows($roomre);
 
-    //roombook roomtype
-    $chartroom1 = "SELECT * FROM roombook WHERE RoomType='Superior Room'";
+    //roombook roomtype - tính tổng số phòng theo từng loại từ bảng payment với status = 'Paid'
+    $chartroom1 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Superior Room' AND status = 'Paid'";
     $chartroom1re = mysqli_query($conn, $chartroom1);
-    $chartroom1row = mysqli_num_rows($chartroom1re);
+    $chartroom1row_result = mysqli_fetch_assoc($chartroom1re);
+    $chartroom1row = $chartroom1row_result['total_rooms'] ?? 0;
 
-    $chartroom2 = "SELECT * FROM roombook WHERE RoomType='Deluxe Room'";
+    $chartroom2 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Deluxe Room' AND status = 'Paid'";
     $chartroom2re = mysqli_query($conn, $chartroom2);
-    $chartroom2row = mysqli_num_rows($chartroom2re);
+    $chartroom2row_result = mysqli_fetch_assoc($chartroom2re);
+    $chartroom2row = $chartroom2row_result['total_rooms'] ?? 0;
 
-    $chartroom3 = "SELECT * FROM roombook WHERE RoomType='Guest House'";
+    $chartroom3 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Guest House' AND status = 'Paid'";
     $chartroom3re = mysqli_query($conn, $chartroom3);
-    $chartroom3row = mysqli_num_rows($chartroom3re);
+    $chartroom3row_result = mysqli_fetch_assoc($chartroom3re);
+    $chartroom3row = $chartroom3row_result['total_rooms'] ?? 0;
 
-    $chartroom4 = "SELECT * FROM roombook WHERE RoomType='Single Room'";
+    $chartroom4 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Single Room' AND status = 'Paid'";
     $chartroom4re = mysqli_query($conn, $chartroom4);
-    $chartroom4row = mysqli_num_rows($chartroom4re);
+    $chartroom4row_result = mysqli_fetch_assoc($chartroom4re);
+    $chartroom4row = $chartroom4row_result['total_rooms'] ?? 0;
 ?>
 <!-- moriss profit -->
 <?php 	
-					$query = "SELECT * FROM payment";
-					$result = mysqli_query($conn, $query);
-					$chart_data = '';
-					$tot = 0;
-					while($row = mysqli_fetch_array($result))
-					{
-              $chart_data .= "{ date:'".$row["cout"]."', profit:".$row["finaltotal"]*10/100 ."}, ";
-              $tot = $tot + $row["finaltotal"]*10/100;
-					}
+	$query = "SELECT * FROM payment WHERE status = 'Paid'"; 
+	$result = mysqli_query($conn, $query);
+	$chart_data = '';
+	$tot = 0;
+	while($row = mysqli_fetch_array($result))
+	{
+        $chart_data .= "{ date:'".$row["cout"]."', profit:".$row["finaltotal"] ."}, ";
+        $tot = $tot + $row["finaltotal"]*1/1000;
+	}
 
-					$chart_data = substr($chart_data, 0, -2);
-				
+	$chart_data = substr($chart_data, 0, -2);
 ?>
 
 <!DOCTYPE html>
@@ -69,31 +73,36 @@
     <title>TDTU - Admin </title>
 </head>
 <body>
-   <div class="databox">
+    <div class="databox">
         <div class="box roombookbox">
-          <h2>Total Booked Room</h1>  
-          <h1><?php echo $roombookrow ?> / <?php echo $roomrow ?></h1>
+            <h2>Total Booked Room</h2>
+            <h1><?php echo $roombookrow ?> / <?php echo $roomrow ?></h1>
         </div>
+
         <div class="box guestbox">
-        <h2>Total Staff</h1>  
-          <h1><?php echo $staffrow ?></h1>
+            <h2>Total Staff</h2>
+            <h1><?php echo $staffrow ?></h1>
         </div>
+
         <div class="box profitbox">
-        <h2>Profit</h1>  
-          <h1><?php echo $tot?> <span>&#8377</span></h1>
+            <h2>Profit</h2>
+            <h1><?php echo $tot ?> <span>&#8363;</span></h1>
         </div>
     </div>
+
     <div class="chartbox">
         <div class="bookroomchart">
             <canvas id="bookroomchart"></canvas>
             <h3 style="text-align: center;margin:10px 0;">Booked Room</h3>
         </div>
-        <div class="profitchart" >
+
+        <div class="profitchart">
             <div id="profitchart"></div>
             <h3 style="text-align: center;margin:10px 0;">Profit</h3>
         </div>
     </div>
 </body>
+
 
 
 
