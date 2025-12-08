@@ -249,10 +249,10 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                         <input type="email" name="Email" placeholder="Enter Email" required>
 
                         <?php
-                        $countries = array("Vietnam", "China", "Japan", "Korea", "Thailand", "Laos", "Campuchia", "Singapore", "Indonesia", "Philippines");
+                        $countries = array("Ho Chi Minh city", "Ha Noi");
                         ?>
                         <select name="Country" class="selectinput" required>
-                            <option value selected disabled>Select your country</option>
+                            <option value selected disabled>Select hotel branch</option>
                             <?php foreach($countries as $c): ?>
                               <option value="<?= $c ?>"><?= $c ?></option>
                             <?php endforeach; ?>
@@ -466,7 +466,7 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
     <i class="fa-solid fa-envelope"></i>
   </div>
   <div class="createdby">
-    <h5>Created by our team</h5>
+    <h5>Created by us</h5>
   </div>
 </section>
 

@@ -41,7 +41,7 @@ include '../config.php';
                 <option value="weighter">weighter</option>
             </select>
 
-            <button type="submit" class="btn btn-success" name="addstaff">Add Room</button>
+            <button type="submit" class="btn btn-success" name="addstaff">Add</button>
         </form>
 
         <?php

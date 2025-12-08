@@ -2,46 +2,67 @@
     session_start();
     include '../config.php';
 
-    // roombook - tính tổng số phòng từ trường NoofRoom trong bảng payment với status = 'Paid'
-    $roombooksql = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE status = 'Paid'";
+    // Lấy giá trị chi nhánh từ URL hoặc POST
+    $selected_branch = isset($_GET['branch']) ? $_GET['branch'] : '';
+
+    // Điều kiện WHERE cho chi nhánh
+    $branch_condition = '';
+    if (!empty($selected_branch)) {
+        $branch_condition = " AND r.Country = '" . mysqli_real_escape_string($conn, $selected_branch) . "'";
+    }
+
+    // roombook - tính tổng số phòng từ trường NoofRoom trong bảng payment với status = 'Paid' và chi nhánh
+    $roombooksql = "SELECT SUM(p.NoofRoom) as total_rooms FROM payment p 
+                    LEFT JOIN roombook r ON p.id = r.id 
+                    WHERE p.status = 'Paid' $branch_condition";
     $roombookre = mysqli_query($conn, $roombooksql);
     $roombookrow_result = mysqli_fetch_assoc($roombookre);
     $roombookrow = $roombookrow_result['total_rooms'] ?? 0; // Nếu không có kết quả thì = 0
 
-    // staff
-    $staffsql ="Select * from staff";
+    // staff - lọc theo chi nhánh
+    $staffsql = "Select * from staff" . ($selected_branch ? " WHERE Country = '" . mysqli_real_escape_string($conn, $selected_branch) . "'" : "");
     $staffre = mysqli_query($conn, $staffsql);
     $staffrow = mysqli_num_rows($staffre);
 
-    // room
-    $roomsql ="Select * from room";
+    // room - lọc theo chi nhánh
+    $roomsql = "Select * from room" . ($selected_branch ? " WHERE Country = '" . mysqli_real_escape_string($conn, $selected_branch) . "'" : "");
     $roomre = mysqli_query($conn, $roomsql);
     $roomrow = mysqli_num_rows($roomre);
 
-    //roombook roomtype - tính tổng số phòng theo từng loại từ bảng payment với status = 'Paid'
-    $chartroom1 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Superior Room' AND status = 'Paid'";
+    //roombook roomtype - tính tổng số phòng theo từng loại từ bảng payment với status = 'Paid' và chi nhánh
+    $chartroom1 = "SELECT SUM(p.NoofRoom) as total_rooms FROM payment p 
+                   LEFT JOIN roombook r ON p.id = r.id 
+                   WHERE p.RoomType='Superior Room' AND p.status = 'Paid' $branch_condition";
     $chartroom1re = mysqli_query($conn, $chartroom1);
     $chartroom1row_result = mysqli_fetch_assoc($chartroom1re);
     $chartroom1row = $chartroom1row_result['total_rooms'] ?? 0;
 
-    $chartroom2 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Deluxe Room' AND status = 'Paid'";
+    $chartroom2 = "SELECT SUM(p.NoofRoom) as total_rooms FROM payment p 
+                   LEFT JOIN roombook r ON p.id = r.id 
+                   WHERE p.RoomType='Deluxe Room' AND p.status = 'Paid' $branch_condition";
     $chartroom2re = mysqli_query($conn, $chartroom2);
     $chartroom2row_result = mysqli_fetch_assoc($chartroom2re);
     $chartroom2row = $chartroom2row_result['total_rooms'] ?? 0;
 
-    $chartroom3 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Guest House' AND status = 'Paid'";
+    $chartroom3 = "SELECT SUM(p.NoofRoom) as total_rooms FROM payment p 
+                   LEFT JOIN roombook r ON p.id = r.id 
+                   WHERE p.RoomType='Guest House' AND p.status = 'Paid' $branch_condition";
     $chartroom3re = mysqli_query($conn, $chartroom3);
     $chartroom3row_result = mysqli_fetch_assoc($chartroom3re);
     $chartroom3row = $chartroom3row_result['total_rooms'] ?? 0;
 
-    $chartroom4 = "SELECT SUM(NoofRoom) as total_rooms FROM payment WHERE RoomType='Single Room' AND status = 'Paid'";
+    $chartroom4 = "SELECT SUM(p.NoofRoom) as total_rooms FROM payment p 
+                   LEFT JOIN roombook r ON p.id = r.id 
+                   WHERE p.RoomType='Single Room' AND p.status = 'Paid' $branch_condition";
     $chartroom4re = mysqli_query($conn, $chartroom4);
     $chartroom4row_result = mysqli_fetch_assoc($chartroom4re);
     $chartroom4row = $chartroom4row_result['total_rooms'] ?? 0;
 ?>
 <!-- moriss profit -->
 <?php 	
-	$query = "SELECT * FROM payment WHERE status = 'Paid'"; 
+	$query = "SELECT p.*, r.Country FROM payment p 
+	          LEFT JOIN roombook r ON p.id = r.id 
+	          WHERE p.status = 'Paid' $branch_condition"; 
 	$result = mysqli_query($conn, $query);
 	$chart_data = '';
 	$tot = 0;
@@ -73,6 +94,15 @@
     <title>TDTU - Admin </title>
 </head>
 <body>
+    <div class="filter-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <label for="branchFilter" style="font-weight: bold; margin-right: 10px;">Filter by Branch:</label>
+        <select id="branchFilter" onchange="applyBranchFilter()" style="padding: 8px; border-radius: 4px; border: 1px solid #ced4da;">
+            <option value="">All Branches</option>
+            <option value="Ho Chi Minh city" <?php echo $selected_branch == 'Ho Chi Minh city' ? 'selected' : ''; ?>>Ho Chi Minh City</option>
+            <option value="Ha Noi" <?php echo $selected_branch == 'Ha Noi' ? 'selected' : ''; ?>>Ha Noi</option>
+        </select>
+    </div>
+
     <div class="databox">
         <div class="box roombookbox">
             <h2>Total Booked Room</h2>
@@ -101,12 +131,21 @@
             <h3 style="text-align: center;margin:10px 0;">Profit</h3>
         </div>
     </div>
-</body>
 
+    <script>
+    function applyBranchFilter() {
+        const branch = document.getElementById('branchFilter').value;
+        const url = new URL(window.location.href);
+        if (branch) {
+            url.searchParams.set('branch', branch);
+        } else {
+            url.searchParams.delete('branch');
+        }
+        window.location.href = url.toString();
+    }
+    </script>
 
-
-
-<script>
+    <script>
         const labels = [
           'Superior Room',
           'Deluxe Room',
@@ -138,21 +177,22 @@
       const myChart = new Chart(
       document.getElementById('bookroomchart'),
       doughnutchart);
-</script>
+    </script>
 
-<script>
-Morris.Bar({
- element : 'profitchart',
- data:[<?php echo $chart_data;?>],
- xkey:'date',
- ykeys:['profit'],
- labels:['Profit'],
- hideHover:'auto',
- stacked:true,
- barColors:[
-  'rgba(153, 102, 255, 1)',
- ]
-});
-</script>
+    <script>
+    Morris.Bar({
+     element : 'profitchart',
+     data:[<?php echo $chart_data;?>],
+     xkey:'date',
+     ykeys:['profit'],
+     labels:['Profit'],
+     hideHover:'auto',
+     stacked:true,
+     barColors:[
+      'rgba(153, 102, 255, 1)',
+     ]
+    });
+    </script>
 
+</body>
 </html>

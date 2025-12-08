@@ -41,6 +41,38 @@ if (isset($_POST['action'])) {
         $room_result = mysqli_query($conn, $check_room);
         $room_count = mysqli_fetch_assoc($room_result)['count'];
 
+        // Kiểm tra số phòng trống trong chi nhánh
+        if ($status == 'Confirmed') {
+            // Lấy số phòng đã được đặt trong khoảng thời gian này cho loại phòng cụ thể
+            $booked_rooms_sql = "SELECT SUM(NoofRoom) as booked_rooms FROM roombook 
+                                 WHERE RoomType = '$RoomType' 
+                                 AND Country = '$row[Country]'
+                                 AND stat = 'Confirmed' 
+                                 AND NOT (cout <= '$cin' OR cin >= '$cout')
+                                 AND id != $id";  
+    
+            $booked_result = mysqli_query($conn, $booked_rooms_sql);
+            $booked_rooms = mysqli_fetch_assoc($booked_result)['booked_rooms'] ?? 0;
+    
+            // Lấy tổng số phòng loại này trong chi nhánh
+            $total_rooms_sql = "SELECT COUNT(*) as total_rooms FROM room 
+                                WHERE type = '$RoomType' 
+                                AND Country = '$row[Country]'";  
+    
+            $total_result = mysqli_query($conn, $total_rooms_sql);
+            $total_rooms = mysqli_fetch_assoc($total_result)['total_rooms'];
+    
+            // Tính số phòng còn trống
+            $available_rooms = $total_rooms - $booked_rooms;
+    
+            // Kiểm tra nếu số phòng đặt vượt quá số phòng trống
+            if ($NoofRoom > $available_rooms) {
+                $_SESSION['error'] = "Not enough rooms available. Only $available_rooms rooms left in $row[Country] branch.";
+                header("Location: roombook.php");
+                exit;
+            }
+        }
+
         if ($status == 'Confirmed' && $room_count == 0) {
             $_SESSION['error'] = "Room $RoomType ($Bed) does not exist!";
             header("Location: roombook.php");
