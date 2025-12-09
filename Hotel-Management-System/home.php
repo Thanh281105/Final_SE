@@ -260,7 +260,11 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                                value="<?php echo $user_info ? htmlspecialchars($user_info['Email']) : ''; ?>" required>
 
                         <?php
-                        $countries = array("Ho Chi Minh city", "Ha Noi");
+                            $branch_query = mysqli_query($conn, "SELECT name FROM branches WHERE status = 'Active' ORDER BY name ASC");
+                            $countries = array();
+                            while ($branch = mysqli_fetch_assoc($branch_query)) {
+                                $countries[] = $branch['name'];
+                            }
                         ?>
                         <select name="Country" class="selectinput" required>
                             <option value selected disabled>Select hotel branch</option>

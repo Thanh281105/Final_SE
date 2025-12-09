@@ -53,6 +53,7 @@ if($usermail == true){
             <li class="pagebtn"><img src="../image/icon/wallet.png">&nbsp&nbsp&nbsp Payment</li>            
             <li class="pagebtn"><img src="../image/icon/bedroom.png">&nbsp&nbsp&nbsp Rooms</li>
             <li class="pagebtn"><img src="../image/icon/staff.png">&nbsp&nbsp&nbsp Staff</li>
+            <li class="pagebtn"><img src="../image/icon/branch.png">&nbsp&nbsp&nbsp Branches</li>
         </ul>
     </nav>
 
@@ -63,6 +64,7 @@ if($usermail == true){
         <iframe class="frames frame3" src="./payment.php" frameborder="0"></iframe>
         <iframe class="frames frame4" src="./room.php" frameborder="0"></iframe>
         <iframe class="frames frame4" src="./staff.php" frameborder="0"></iframe>
+        <iframe class="frames frame5" src="./branches.php" frameborder="0"></iframe>
     </div>
 </body>
 

@@ -90,15 +90,11 @@ function prepareAndExecute($conn, $sql, $params)
                 ?>
                 <form class="user_login authsection active" id="userlogin" action="" method="POST">
                     <div class="form-floating">
-                        <input type="text" class="form-control" name="Username" placeholder=" ">
-                        <label for="Username">Username</label>
-                    </div>
-                    <div class="form-floating">
-                        <input type="email" class="form-control" name="Email" placeholder=" ">
+                        <input type="email" class="form-control" name="Email" placeholder=" " required>
                         <label for="Email">Email</label>
                     </div>
                     <div class="form-floating">
-                        <input type="password" class="form-control" name="Password" placeholder=" ">
+                        <input type="password" class="form-control" name="Password" placeholder=" " required>
                         <label for="Password">Password</label>
                     </div>
                     <button type="submit" name="user_login_submit" class="auth_btn">Log in</button>

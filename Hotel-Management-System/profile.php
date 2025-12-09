@@ -9,6 +9,7 @@ if (!isset($_SESSION['usermail'])) {
 
 $email = $_SESSION['usermail'];
 
+// Lấy thông tin người dùng
 $user_query = mysqli_query($conn, "SELECT * FROM signup WHERE Email = '$email' LIMIT 1");
 $user = mysqli_fetch_assoc($user_query);
 
@@ -24,7 +25,8 @@ if (mysqli_num_rows($check_col) > 0) {
 $bookings_query = mysqli_query($conn, 
     "SELECT r.*, 
             COALESCE(p.finaltotal, 0) as finaltotal,
-            COALESCE(p.status, r.stat) as payment_status
+            COALESCE(p.status, r.stat) as payment_status,
+            p.qr_url
      FROM roombook r 
      LEFT JOIN payment p ON r.id = p.id 
      WHERE r.Email = '$email' 
@@ -39,11 +41,12 @@ $bookings_query = mysqli_query($conn,
     <title>My Profile - Hotel TDTU</title>
     
     <link rel="stylesheet" href="./css/home.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"/>
-    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css  " rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css  "/>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js  "></script>
 
     <style>
+        /* Avatar và camera overlay */
         .avatar-large-container {
             position: relative;
             display: inline-block;
@@ -86,17 +89,17 @@ $bookings_query = mysqli_query($conn,
             height: 100%;
             background-color: rgba(0,0,0,0.5);
         }
-
+        
         .modal-content {
             background-color: #fefefe;
             margin: 15% auto;
             padding: 20px;
             border: none;
             border-radius: 10px;
-            width: 300px;
+            width: 600px;
             text-align: center;
         }
-
+        
         .close {
             color: #aaa;
             float: right;
@@ -104,15 +107,15 @@ $bookings_query = mysqli_query($conn,
             font-weight: bold;
             cursor: pointer;
         }
-
+        
         .close:hover {
             color: black;
         }
-
+        
         #file-input {
             margin: 15px 0;
         }
-
+        
         #upload-btn {
             background-color: #007bff;
             color: white;
@@ -121,10 +124,11 @@ $bookings_query = mysqli_query($conn,
             border-radius: 5px;
             cursor: pointer;
         }
-
+        
         #upload-btn:hover {
             background-color: #0056b3;
         }
+        
         :root {
             --primary: #007bff;
             --success: #28a745;
@@ -179,6 +183,7 @@ $bookings_query = mysqli_query($conn,
         .status-confirmed     { background:#d4edda; color:#155724; }
         .status-paid          { background:#d1ecf1; color:#0c5460; }
         .status-rejected      { background:#f8d7da; color:#721c24; }
+        .status-cancelled     { background:#e2e3e5; color:#383d41; }
         .booking-table th {
             background: #f8f9fa;
             font-weight: 600;
@@ -247,7 +252,8 @@ $bookings_query = mysqli_query($conn,
             opacity: 0.8;
         }
         
-        .payment-btn {
+        /* Nút QR Payment */
+        .qr-btn {
             background: var(--success);
             color: white;
             border: none;
@@ -257,8 +263,23 @@ $bookings_query = mysqli_query($conn,
             display: inline-block;
             font-size: 14px;
         }
-        .payment-btn:hover {
+        .qr-btn:hover {
             background: #218838;
+            color: white;
+        }
+        
+        .cancel-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+        }
+        .cancel-btn:hover {
+            background: #c82333;
             color: white;
         }
     </style>
@@ -283,12 +304,7 @@ $bookings_query = mysqli_query($conn,
 <div class="profile-container">
 
     <div class="profile-header">
-        <div class="avatar-large-container" onclick="openModal()">
-            <img src="<?php echo htmlspecialchars($avatar); ?>" alt="Avatar" class="avatar-large">
-            <div class="camera-overlay">
-                <i class="fas fa-camera camera-icon"></i>
-            </div>
-        </div>
+        <img src="<?php echo htmlspecialchars($avatar); ?>" alt="Avatar" class="avatar-large">
         <h2 class="mt-3"><?php echo htmlspecialchars($user['Username'] ?? 'Guest'); ?></h2>
         <p><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($email); ?></p>
     </div>
@@ -343,7 +359,7 @@ $bookings_query = mysqli_query($conn,
                             <th>Nights</th>
                             <th>Status</th>
                             <th>Total</th>
-                            <th>Payment</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -354,6 +370,9 @@ $bookings_query = mysqli_query($conn,
                             
                             // Kiểm tra xem có thể thanh toán không
                             $can_pay = ($b['stat'] === 'Confirmed' && $b['finaltotal'] > 0 && $status !== 'Paid');
+                            
+                            // Kiểm tra xem có thể hủy không
+                            $can_cancel = ($b['stat'] === 'Not Confirmed' || ($b['stat'] === 'Confirmed' && $status !== 'Paid'));
                         ?>
                             <tr>
                                 <td>#<?php echo $b['id']; ?></td>
@@ -375,15 +394,17 @@ $bookings_query = mysqli_query($conn,
                                 </td>
                                 <td>
                                     <?php if ($can_pay): ?>
-                                        <a href="generate_qr.php?booking_id=<?php echo $b['id']; ?>" class="payment-btn">
-                                            <i class="fas fa-qrcode"></i> Pay
+                                        <a href="generate_qr.php?booking_id=<?php echo $b['id']; ?>" class="qr-btn">
+                                            <i class="fas fa-qrcode"></i> Pay Now
                                         </a>
-                                    <?php else: ?>
-                                        <?php if ($status === 'Paid'): ?>
-                                            <span class="text-success">Paid</span>
-                                        <?php else: ?>
-                                            <span class="text-muted">Unable to pay</span>
-                                        <?php endif; ?>
+                                    <?php elseif ($status === 'Paid'): ?>
+                                        <span class="text-success">Paid</span>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($can_cancel): ?>
+                                        <a href="cancel_booking.php?id=<?php echo $b['id']; ?>" class="cancel-btn" onclick="return confirm('Are you sure you want to cancel this booking?')">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </a>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -400,38 +421,12 @@ $bookings_query = mysqli_query($conn,
     </div>
 
 </div>
-<!-- Avatar Upload Modal -->
-<div id="avatarModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <h4>Change Avatar</h4>
-        <form id="avatarForm" action="update_avatar.php" method="POST" enctype="multipart/form-data">
-            <input type="file" id="file-input" name="avatar" accept="image/*" required>
-            <button type="submit" id="upload-btn">Upload</button>
-        </form>
-    </div>
-</div>
 
 <script>
-    function openModal() {
-        document.getElementById('avatarModal').style.display = 'block';
-    }
-
-    function closeModal() {
-        document.getElementById('avatarModal').style.display = 'none';
-    }
-
-    // Close modal when clicking outside of it
-    window.onclick = function(event) {
-        var modal = document.getElementById('avatarModal');
-        if (event.target == modal) {
-            closeModal();
-        }
-    }
-    document.querySelectorAll('.avatar-dropdown').forEach(d => {
-        d.addEventListener('mouseenter', () => d.querySelector('.dropdown-menu').style.display = 'block');
-        d.addEventListener('mouseleave', () => d.querySelector('.dropdown-menu').style.display = 'none');
-    });
+document.querySelectorAll('.avatar-dropdown').forEach(d => {
+    d.addEventListener('mouseenter', () => d.querySelector('.dropdown-menu').style.display = 'block');
+    d.addEventListener('mouseleave', () => d.querySelector('.dropdown-menu').style.display = 'none');
+});
 </script>
 
 </body>

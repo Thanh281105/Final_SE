@@ -39,9 +39,6 @@ if (isset($_GET['update_status']) && isset($_GET['room_id'])) {
     $selected_branch = $_GET['branch'] ?? 'Ho Chi Minh city'; // Giữ chi nhánh hiện tại
     
     if ($new_status == 'Available') {
-        // Lấy thông tin phòng hiện tại
-        $room_info = mysqli_fetch_assoc(mysqli_query($conn, "SELECT current_booking_id, type, bedding, Country FROM room WHERE id = $room_id"));
-        
         // Cập nhật trạng thái phòng
         $update_room_sql = "UPDATE room SET 
                           status = 'Available', 
@@ -50,19 +47,6 @@ if (isset($_GET['update_status']) && isset($_GET['room_id'])) {
                           reserved_until = NULL 
                           WHERE id = $room_id";
         mysqli_query($conn, $update_room_sql);
-        
-        // Nếu phòng có booking hiện tại, cập nhật lại trạng thái booking
-        if (!empty($room_info['current_booking_id'])) {
-            $booking_id = $room_info['current_booking_id'];
-            
-            // Cập nhật lại trạng thái booking trong roombook
-            $update_booking_sql = "UPDATE roombook SET stat = 'Not Confirmed' WHERE id = $booking_id";
-            mysqli_query($conn, $update_booking_sql);
-            
-            // Cập nhật lại trạng thái trong payment nếu có
-            $update_payment_sql = "UPDATE payment SET status = 'Pending' WHERE id = $booking_id";
-            mysqli_query($conn, $update_payment_sql);
-        }
     } else {
         // Nếu chuyển sang Occupied, cập nhật trạng thái phòng
         $update_room_sql = "UPDATE room SET status = 'Occupied' WHERE id = $room_id";
@@ -259,8 +243,13 @@ while ($row = mysqli_fetch_array($re)) {
     <div class="filter-section">
         <label for="branchFilter" style="font-weight: bold; margin-right: 10px;">Branch:</label>
         <select id="branchFilter" onchange="applyBranchFilter()" style="padding: 5px; border-radius: 4px; border: 1px solid #ced4da;">
-            <option value="Ho Chi Minh city" <?php echo $selected_branch == 'Ho Chi Minh city' ? 'selected' : ''; ?>>Ho Chi Minh City</option>
-            <option value="Ha Noi" <?php echo $selected_branch == 'Ha Noi' ? 'selected' : ''; ?>>Ha Noi</option>
+            <?php
+            $branch_query = mysqli_query($conn, "SELECT name FROM branches WHERE status = 'Active' ORDER BY name ASC");
+            while ($branch = mysqli_fetch_assoc($branch_query)) {
+                $selected = $selected_branch == $branch['name'] ? 'selected' : '';
+                echo "<option value=\"" . htmlspecialchars($branch['name']) . "\" $selected>" . htmlspecialchars($branch['name']) . "</option>";
+            }
+            ?>
         </select>
     </div>
 
@@ -287,8 +276,12 @@ while ($row = mysqli_fetch_array($re)) {
             </div>
             <div class="col-md-2">
                 <select name="country" class="form-control" required>
-                    <option value="Ho Chi Minh city">Ho Chi Minh City</option>
-                    <option value="Ha Noi">Ha Noi</option>
+                    <?php
+                    $branch_query = mysqli_query($conn, "SELECT name FROM branches WHERE status = 'Active' ORDER BY name ASC");
+                    while ($branch = mysqli_fetch_assoc($branch_query)) {
+                        echo "<option value=\"" . htmlspecialchars($branch['name']) . "\">" . htmlspecialchars($branch['name']) . "</option>";
+                    }
+                    ?>
                 </select>
             </div>
             <div class="col-md-2">
@@ -324,13 +317,6 @@ while ($row = mysqli_fetch_array($re)) {
             <div class='room-number'><?php echo $room['room_number']; ?></div>
             <div class='room-info'><?php echo $room['type']; ?></div>
             <div class='room-info'>Bed: <?php echo $room['bedding']; ?></div>
-
-            <?php if ($room['status'] == 'Occupied'): ?>
-                <!-- Debug info -->
-                <div style="font-size: 10px; color: red;">
-                    Debug: Status=<?php echo $room['status']; ?>, Customer=<?php echo !empty($room['customer_name']) ? 'YES' : 'NO'; ?>, ID=<?php echo $room['id']; ?>
-                </div>
-            <?php endif; ?>
 
             <?php if ($room['status'] == 'Occupied' && !empty($room['current_booking_id']) && !empty($room['customer_name'])): ?>
             <div class='booking-info' style='display:none; border: 1px solid #007bff; margin-top: 8px; padding: 8px; background: #e7f3ff; border-radius: 4px;' id='info_<?php echo $room['id']; ?>'>
@@ -376,37 +362,24 @@ while ($row = mysqli_fetch_array($re)) {
     </div>
     <?php endforeach; ?>
 
-<script>
-function applyBranchFilter() {
-    const branch = document.getElementById('branchFilter').value;
-    const url = new URL(window.location.href);
-    url.searchParams.set('branch', branch);
-    window.location.href = url.toString();
-}
-
-function toggleBookingInfo(roomId) {
-    console.log('Toggle booking info for room: ' + roomId);
-    
-    // Thử cả 2 cách để tìm phần tử
-    let infoDiv = document.getElementById('info_' + roomId);
-    
-    if (infoDiv) {
-        console.log('Found element with ID: info_' + roomId);
-        if (infoDiv.style.display === 'none' || infoDiv.style.display === '') {
-            infoDiv.style.display = 'block';
-        } else {
-            infoDiv.style.display = 'none';
-        }
-    } else {
-        console.log('Element with ID info_' + roomId + ' not found');
-        // Kiểm tra xem phần tử có tồn tại không bằng cách tìm tất cả các phần tử có ID chứa 'info_'
-        const allElements = document.querySelectorAll('[id*="info_"]');
-        console.log('Found ' + allElements.length + ' elements with ID containing "info_"');
-        allElements.forEach(function(el) {
-            console.log('Element ID: ' + el.id);
-        });
+    <script>
+    function applyBranchFilter() {
+        const branch = document.getElementById('branchFilter').value;
+        const url = new URL(window.location.href);
+        url.searchParams.set('branch', branch);
+        window.location.href = url.toString();
     }
-}
-</script>
+
+    function toggleBookingInfo(roomId) {
+        const infoDiv = document.getElementById('info_' + roomId);
+        if (infoDiv) {
+            if (infoDiv.style.display === 'none' || infoDiv.style.display === '') {
+                infoDiv.style.display = 'block';
+            } else {
+                infoDiv.style.display = 'none';
+            }
+        }
+    }
+    </script>
 </body>
 </html>
