@@ -24,9 +24,9 @@ if (isset($_POST['guestdetailsubmit'])) {
     if (empty($Name) || empty($Email) || empty($Country) || empty($Phone) || empty($RoomType) || empty($Bed) || empty($NoofRoom) || empty($Meal) || empty($cin) || empty($cout)) {
         echo "<script>swal({title:'Please fill all fields',icon:'error'});</script>";
     } elseif (strtotime($cin) >= strtotime($cout)) {
-        echo "<script>swal({title:'Check-out must be after check-in',icon:'error'});</script>";
-    } elseif (strtotime($cin) < strtotime('2025-11-26')) {
-        echo "<script>swal({title:'Check-in cannot be in the past',icon:'error'});</script>";
+        echo "<script>swal({title:'Check-out date must be after check-in date',icon:'error'});</script>";
+    } elseif (strtotime($cin) < time()) {
+        echo "<script>swal({title:'Check-in date cannot be in the past',icon:'error'});</script>";
     } else {
         $sta = 'Not Confirmed';
         $nodays = ((strtotime($cout) - strtotime($cin)) / (60 * 60 * 24));
@@ -182,18 +182,16 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
 <body>
 
   <nav>
-    <!-- Logo được đặt trong một thẻ <a> để click chuyển hướng -->
     <a href="home.php" class="logo" style="text-decoration: none; color: inherit; display: flex; align-items: center;">
-        <img class="bluebirdlogo" src="./image/bluebirdlogo.png" alt="logo" style="margin-right: 8px;"> <!-- Khoảng cách nhỏ giữa logo và chữ -->
+        <img class="bluebirdlogo" src="./image/bluebirdlogo.png" alt="logo" style="margin-right: 8px;">
         <p>TDTU</p>
     </a>
     <ul>
-      <li><a href="#firstsection">Home</a></li> <!-- Có thể giữ hoặc bỏ, tùy bạn -->
+      <li><a href="#firstsection">Home</a></li> 
       <li><a href="#secondsection">Rooms</a></li>
       <li><a href="#thirdsection">Facilities</a></li>
       <li><a href="#contactus">Contact us</a></li>
 
-      <!-- Bỏ <a href="./logout.php"><button class="btn btn-danger">Logout</button></a> -->
       <li class="avatar-dropdown">
         <?php
         $avatar_path = 'image/Profile.png';
@@ -245,8 +243,21 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                 <div class="middle">
                     <div class="guestinfo">
                         <h4>Guest information</h4>
-                        <input type="text" name="Name" placeholder="Enter Full name" required>
-                        <input type="email" name="Email" placeholder="Enter Email" required>
+                        <?php
+                        // Lấy thông tin khách hàng từ session
+                        $user_info = null;
+                        if (isset($_SESSION['usermail'])) {
+                            $user_email = $_SESSION['usermail'];
+                            $user_query = mysqli_query($conn, "SELECT Username, Email, phone FROM signup WHERE Email = '$user_email' LIMIT 1");
+                            if ($user_query && mysqli_num_rows($user_query) > 0) {
+                                $user_info = mysqli_fetch_assoc($user_query);
+                            }
+                        }
+                        ?>
+                        <input type="text" name="Name" placeholder="Enter Full name" 
+                               value="<?php echo $user_info ? htmlspecialchars($user_info['Username']) : ''; ?>" required>
+                        <input type="email" name="Email" placeholder="Enter Email" 
+                               value="<?php echo $user_info ? htmlspecialchars($user_info['Email']) : ''; ?>" required>
 
                         <?php
                         $countries = array("Ho Chi Minh city", "Ha Noi");
@@ -257,7 +268,8 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                               <option value="<?= $c ?>"><?= $c ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <input type="text" name="Phone" placeholder="Enter Phone" required>
+                        <input type="text" name="Phone" placeholder="Enter Phone" 
+                               value="<?php echo $user_info && !empty($user_info['phone']) ? htmlspecialchars($user_info['phone']) : ''; ?>" required>
                     </div>
 
                     <div class="line"></div>
@@ -300,15 +312,14 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
                         <div class="datesection">
                             <span>
                                 <label>Check-In</label>
-                                <input name="cin" type="date" required min="<?php echo date('Y-m-d'); ?>" onchange="calculateTotal()">
+                                <input name="cin" id="cin" type="date" required min="<?php echo date('Y-m-d'); ?>" onchange="updateCheckoutMin(); calculateTotal()">
                             </span>
                             <span>
                                 <label>Check-Out</label>
-                                <input name="cout" type="date" required min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>" onchange="calculateTotal()">
+                                <input name="cout" id="cout" type="date" required min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>" onchange="calculateTotal()">
                             </span>
                         </div>
                 
-                        <!-- Di chuyển phần hiển thị giá tiền vào đây -->
                         <div id="totalPrice"></div>
                     </div>
                 </div>
@@ -690,6 +701,15 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
         const cin = document.querySelector('input[name="cin"]').value;
         const cout = document.querySelector('input[name="cout"]').value;
     
+        if (cin && cout) {
+            const startDate = new Date(cin);
+            const endDate = new Date(cout);
+            if (endDate <= startDate) {
+                document.getElementById('totalPrice').innerHTML = '<h4 style="color: #dc3545; margin-top: 15px;">Error: Check-out date must be after check-in date</h4>';
+                return;
+            }
+        }
+
         if (!roomType || !cin || !cout) {
             document.getElementById('totalPrice').innerHTML = '';
             return;
@@ -789,6 +809,29 @@ if ($user_res && mysqli_num_rows($user_res) > 0) {
         }
         calculateTotal(); // Gọi lại hàm tính giá
     }
+
+    function updateCheckoutMin() {
+        const cin = document.getElementById('cin').value;
+        if (cin) {
+            const cinDate = new Date(cin);
+            const nextDay = new Date(cinDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+        
+            const nextDayStr = nextDay.toISOString().split('T')[0];
+            document.getElementById('cout').min = nextDayStr;
+        
+            // Nếu checkout hiện tại <= checkin, reset checkout
+            const cout = document.getElementById('cout').value;
+            if (cout && new Date(cout) <= new Date(cin)) {
+                document.getElementById('cout').value = '';
+            }
+        }
+    }
+
+    // Gọi hàm khi load trang để đảm bảo tính nhất quán
+    document.addEventListener('DOMContentLoaded', function() {
+        updateCheckoutMin();
+    });
 
 </script>
 

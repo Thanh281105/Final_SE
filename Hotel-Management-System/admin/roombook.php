@@ -36,50 +36,7 @@ if (isset($_POST['action'])) {
             exit;
         }
 
-        // Check availability (simple: exists room with matching type & bedding)
-        $check_room = "SELECT COUNT(*) as count FROM room WHERE type = '$RoomType' AND bedding = '$Bed'";
-        $room_result = mysqli_query($conn, $check_room);
-        $room_count = mysqli_fetch_assoc($room_result)['count'];
-
-        // Kiểm tra số phòng trống trong chi nhánh
-        if ($status == 'Confirmed') {
-            // Lấy số phòng đã được đặt trong khoảng thời gian này cho loại phòng cụ thể
-            $booked_rooms_sql = "SELECT SUM(NoofRoom) as booked_rooms FROM roombook 
-                                 WHERE RoomType = '$RoomType' 
-                                 AND Country = '$row[Country]'
-                                 AND stat = 'Confirmed' 
-                                 AND NOT (cout <= '$cin' OR cin >= '$cout')
-                                 AND id != $id";  
-    
-            $booked_result = mysqli_query($conn, $booked_rooms_sql);
-            $booked_rooms = mysqli_fetch_assoc($booked_result)['booked_rooms'] ?? 0;
-    
-            // Lấy tổng số phòng loại này trong chi nhánh
-            $total_rooms_sql = "SELECT COUNT(*) as total_rooms FROM room 
-                                WHERE type = '$RoomType' 
-                                AND Country = '$row[Country]'";  
-    
-            $total_result = mysqli_query($conn, $total_rooms_sql);
-            $total_rooms = mysqli_fetch_assoc($total_result)['total_rooms'];
-    
-            // Tính số phòng còn trống
-            $available_rooms = $total_rooms - $booked_rooms;
-    
-            // Kiểm tra nếu số phòng đặt vượt quá số phòng trống
-            if ($NoofRoom > $available_rooms) {
-                $_SESSION['error'] = "Not enough rooms available. Only $available_rooms rooms left in $row[Country] branch.";
-                header("Location: roombook.php");
-                exit;
-            }
-        }
-
-        if ($status == 'Confirmed' && $room_count == 0) {
-            $_SESSION['error'] = "Room $RoomType ($Bed) does not exist!";
-            header("Location: roombook.php");
-            exit;
-        }
-
-        // Calculate totals (exact same as roombookedit.php)
+        // Calculate totals (đặt trước đoạn kiểm tra phòng trống)
         $type_of_room = match($RoomType) {
             'Superior Room' => 3000,
             'Deluxe Room' => 2000,
@@ -108,6 +65,74 @@ if (isset($_POST['action'])) {
         $mealtotal = $type_of_meal * $nodays * $NoofRoom * 1000;
         $finaltotal = $roomtotal + $bedtotal + $mealtotal;
 
+        // Kiểm tra đầy đủ điều kiện phòng
+        if ($status == 'Confirmed') {
+            // Lấy tổng số phòng loại này trong chi nhánh với đúng loại giường
+            $total_rooms_sql = "SELECT COUNT(*) as total_rooms FROM room 
+                                WHERE type = '$RoomType' 
+                                AND bedding = '$Bed'
+                                AND Country = '$Country'";
+
+            $total_result = mysqli_query($conn, $total_rooms_sql);
+            $total_rooms = mysqli_fetch_assoc($total_result)['total_rooms'];
+
+            // Lấy số phòng đang có trạng thái khác Available (đang bận hoặc chờ)
+            $non_available_rooms_sql = "SELECT COUNT(*) as non_available_rooms FROM room 
+                                        WHERE type = '$RoomType' 
+                                        AND bedding = '$Bed'
+                                        AND Country = '$Country'
+                                        AND status != 'Available'";
+
+            $non_available_result = mysqli_query($conn, $non_available_rooms_sql);
+            $non_available_rooms = mysqli_fetch_assoc($non_available_result)['non_available_rooms'];
+
+            // Tính số phòng còn trống
+            $available_rooms = $total_rooms - $non_available_rooms;
+    
+            // Kiểm tra nếu số phòng đặt vượt quá số phòng trống
+            if ($NoofRoom > $available_rooms) {
+                $_SESSION['error'] = "Not enough rooms available. Only $available_rooms rooms left in $row[Country] branch (Type: $RoomType, Bed: $Bed).";
+                header("Location: roombook.php");
+                exit;
+            }
+    
+            // Thêm bản ghi vào bảng payment nếu chưa tồn tại
+            $check_payment = mysqli_query($conn, "SELECT * FROM payment WHERE id = $id");
+            if (mysqli_num_rows($check_payment) == 0) {
+                $payment_sql = "INSERT INTO payment (id, Name, Email, RoomType, Bed, NoofRoom, meal, cin, cout, noofdays, roomtotal, bedtotal, mealtotal, finaltotal, status) 
+                                VALUES ($id, '$Name', '$Email', '$RoomType', '$Bed', $NoofRoom, '$Meal', '$cin', '$cout', $nodays, $roomtotal, $bedtotal, $mealtotal, $finaltotal, 'Pending')";
+                mysqli_query($conn, $payment_sql);
+            }
+
+            // Lấy các ID phòng cụ thể để cập nhật
+            $reserved_until = date('Y-m-d H:i:s', strtotime('+24 hours')); // Hết hạn sau 24h
+
+            $room_ids_sql = "SELECT id FROM room 
+                             WHERE type = '$RoomType' 
+                             AND bedding = '$Bed'
+                             AND Country = '$row[Country]'
+                             AND status = 'Available'
+                             LIMIT $NoofRoom";
+
+            $room_ids_result = mysqli_query($conn, $room_ids_sql);
+            $room_ids = array();
+            while ($room = mysqli_fetch_assoc($room_ids_result)) {
+                $room_ids[] = $room['id'];
+            }
+
+            if (count($room_ids) < $NoofRoom) {
+                $_SESSION['error'] = "Not enough available rooms to reserve. Only " . count($room_ids) . " rooms available.";
+                header("Location: roombook.php");
+                exit;
+            }
+
+            // Cập nhật từng phòng theo ID
+            foreach ($room_ids as $room_id) {
+                $update_room_sql = "UPDATE room SET status = 'Reserved', reserved_booking_id = $id, reserved_until = '$reserved_until' WHERE id = $room_id";
+                mysqli_query($conn, $update_room_sql);
+            }
+        }
+
         // Update roombook status
         mysqli_query($conn, "UPDATE roombook SET stat = '$status' WHERE id = $id");
 
@@ -132,7 +157,7 @@ if (isset($_POST['action'])) {
             $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = 587;
 
-            $mail->setFrom('phamnguyenanhsva@gmail.com', 'Hotel TDTU');
+            $mail->setFrom('your_email@gmail.com', 'Hotel TDTU');
             $mail->addAddress($Email, $Name);
 
             $mail->isHTML(true);
@@ -141,18 +166,38 @@ if (isset($_POST['action'])) {
             $status_vn = $status == 'Confirmed' ? 'CONFIRMED' : 'REJECTED';
             $total_vnd = number_format($finaltotal, 0, ',', '.') . ' VND';
 
-            $mail->Body = "
-                <h2>Booking status: <strong style='color: " . ($status == 'Confirmed' ? 'green' : 'red') . "'>$status_vn</strong></h2>
-                <p>Dear <strong>$Name</strong>,</p>
-                <p>Your Reservation:</p>
-                <ul>
-                    <li>Room Type: $RoomType</li>
-                    <li>Room Number: $NoofRoom</li>
-                    <li>Check-in: $cin</li>
-                    <li>Check-out: $cout</li>
-                    <li>Total: <strong>$total_vnd</strong></li>
-                </ul>
-                " . ($status == 'Confirmed' ? '<p>Please pay before coming!</p>' : '<p>Sorry for the inconvenience!</p>');
+            if ($status == 'Confirmed') {
+                $payment_deadline = date('d/m/Y H:i', strtotime('+24 hours', strtotime($cin))); // Có thể thay đổi thời gian
+                $mail->Body = "
+                    <h2>Booking status: <strong style='color: green'>CONFIRMED</strong></h2>
+                    <p>Dear <strong>$Name</strong>,</p>
+                    <p>Your Reservation has been confirmed. Please complete payment before <strong>$payment_deadline</strong> to secure your booking.</p>
+                    <p>Your Reservation Details:</p>
+                    <ul>
+                        <li>Room Type: $RoomType</li>
+                        <li>Number of Rooms: $NoofRoom</li>
+                        <li>Check-in: " . date('d/m/Y', strtotime($cin)) . "</li>
+                        <li>Check-out: " . date('d/m/Y', strtotime($cout)) . "</li>
+                        <li>Total Amount: <strong>$total_vnd</strong></li>
+                        <li><strong>Payment Deadline: $payment_deadline</strong></li>
+                    </ul>
+                    <p><strong>Important:</strong> Your booking will be automatically canceled if payment is not completed by the deadline.</p>
+                    <p>Please contact us if you need any assistance with payment.</p>";
+            } else {
+                $mail->Body = "
+                    <h2>Booking status: <strong style='color: red'>REJECTED</strong></h2>
+                    <p>Dear <strong>$Name</strong>,</p>
+                    <p>Unfortunately, your reservation has been declined.</p>
+                    <p>Reservation Details:</p>
+                    <ul>
+                        <li>Room Type: $RoomType</li>
+                        <li>Number of Rooms: $NoofRoom</li>
+                        <li>Check-in: " . date('d/m/Y', strtotime($cin)) . "</li>
+                        <li>Check-out: " . date('d/m/Y', strtotime($cout)) . "</li>
+                        <li>Total Amount: <strong>$total_vnd</strong></li>
+                    </ul>
+                    <p>Sorry for the inconvenience!</p>";
+            }
 
             $mail->send();
             $_SESSION['success'] = "Updated and email sent successfully!";
@@ -210,7 +255,7 @@ $result = mysqli_query($conn, $sql);
                     <th>ID</th>
                     <th>Email</th>
                     <th>Phone</th>
-                    <th>Country</th> 
+                    <th>Branch</th> 
                     <th>Type of Room</th>
                     <th>Bed</th>
                     <th>Meal</th>
@@ -246,6 +291,42 @@ $result = mysqli_query($conn, $sql);
                                 <button type="submit" name="action" value="confirm" class="btn btn-confirm">Confirm</button>
                                 <button type="submit" name="action" value="reject" class="btn btn-reject">Reject</button>
                             </form>
+        
+                            <!-- Hiển thị thông tin phòng trống -->
+                            <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                                <?php
+                                // Tính số phòng trống
+                                $RoomType = $row['RoomType'];
+                                $Bed = $row['Bed'];  // Thêm loại giường
+                                $Country = $row['Country'];
+                                $cin = $row['cin'];
+                                $cout = $row['cout'];
+            
+                                // Lấy tổng số phòng loại này trong chi nhánh với đúng loại giường
+                                $total_rooms_sql = "SELECT COUNT(*) as total_rooms FROM room 
+                                                    WHERE type = '$RoomType' 
+                                                    AND bedding = '$Bed'
+                                                    AND Country = '$Country'";
+            
+                                $total_result = mysqli_query($conn, $total_rooms_sql);
+                                $total_rooms = mysqli_fetch_assoc($total_result)['total_rooms'];
+                                
+                                // Lấy số phòng đang có trạng thái khác Available (đang bận hoặc chờ)
+                                $non_available_rooms_sql = "SELECT COUNT(*) as non_available_rooms FROM room 
+                                                            WHERE type = '$RoomType' 
+                                                            AND bedding = '$Bed'
+                                                            AND Country = '$Country'
+                                                            AND status != 'Available'";
+            
+                                $non_available_result = mysqli_query($conn, $non_available_rooms_sql);
+                                $non_available_rooms = mysqli_fetch_assoc($non_available_result)['non_available_rooms'];
+                                
+                                // Tính số phòng còn trống
+                                $available_rooms = $total_rooms - $non_available_rooms;
+            
+                                echo "<strong>Available:</strong> $available_rooms rooms (Bed: $Bed)";
+                                ?>
+                            </div>
                         <?php endif; ?>
                     </td>
                 </tr>
